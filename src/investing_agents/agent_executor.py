@@ -5,6 +5,7 @@ and provides financial analysis using AI.
 """
 
 import os
+import textwrap
 from typing import Optional
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -17,6 +18,18 @@ try:
 except ImportError:
     genai = None
     types = None
+
+
+# Prompt template for AI-powered analysis
+INVESTMENT_ADVISOR_PROMPT = textwrap.dedent("""
+    You are an investment advisor agent. Provide professional, 
+    informative responses about investment strategies, financial markets, and portfolio management.
+
+    User query: {query}
+
+    Provide a clear, helpful response focused on investment strategy and financial analysis.
+    Include relevant considerations like risk management, diversification, and market trends where appropriate.
+""").strip()
 
 
 class InvestmentAgent:
@@ -45,13 +58,7 @@ class InvestmentAgent:
         """
         if self.client:
             # Use Gemini for AI-powered analysis
-            prompt = f"""You are an investment advisor agent. Provide professional, 
-informative responses about investment strategies, financial markets, and portfolio management.
-
-User query: {query}
-
-Provide a clear, helpful response focused on investment strategy and financial analysis.
-Include relevant considerations like risk management, diversification, and market trends where appropriate."""
+            prompt = INVESTMENT_ADVISOR_PROMPT.format(query=query)
             
             try:
                 response = self.client.models.generate_content(

@@ -11,6 +11,10 @@ import httpx
 from a2a.client import A2ACardResolver, A2AClient
 from a2a.types import MessageSendParams, SendStreamingMessageRequest
 
+# Constants
+SEPARATOR = '=' * 70
+LINE_SEPARATOR = '-' * 70
+
 
 async def test_investment_agent(query: str, agent_url: str = "http://localhost:8000") -> None:
     """Test the investment agent with a query.
@@ -19,11 +23,11 @@ async def test_investment_agent(query: str, agent_url: str = "http://localhost:8
         query: The investment question to ask.
         agent_url: URL of the investment agent server.
     """
-    print(f"\n{'='*70}")
+    print(f"\n{SEPARATOR}")
     print(f"Testing Investment Agent")
     print(f"Agent URL: {agent_url}")
     print(f"Query: {query}")
-    print(f"{'='*70}\n")
+    print(f"{SEPARATOR}\n")
     
     try:
         async with httpx.AsyncClient() as http_client:
@@ -68,15 +72,15 @@ async def test_investment_agent(query: str, agent_url: str = "http://localhost:8
             # Send the task and stream the response
             print("Sending query to agent...\n")
             print(f"Response:")
-            print(f"{'-'*70}")
+            print(LINE_SEPARATOR)
             
             stream_response = client.send_message_streaming(streaming_request)
             
             async for chunk in stream_response:
                 print(chunk.model_dump(mode='json', exclude_none=True))
             
-            print(f"{'-'*70}\n")
-            print(f"✓ Query completed successfully")
+            print(LINE_SEPARATOR)
+            print(f"\n✓ Query completed successfully")
             
     except httpx.ConnectError:
         print(f"✗ Error: Could not connect to agent at {agent_url}")
@@ -97,10 +101,10 @@ async def run_interactive_mode(agent_url: str = "http://localhost:8000") -> None
         agent_url: URL of the investment agent server.
     """
     print("Investment Strategy Agent - Interactive Client")
-    print("=" * 70)
+    print(SEPARATOR)
     print(f"Connected to: {agent_url}")
     print("Type 'quit' or 'exit' to end the session")
-    print("=" * 70)
+    print(SEPARATOR)
     print()
     
     while True:
