@@ -12,9 +12,11 @@ from a2a.server.events import EventQueue
 from a2a.utils import new_agent_text_message
 
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
 except ImportError:
     genai = None
+    types = None
 
 
 class InvestmentAgent:
@@ -27,11 +29,10 @@ class InvestmentAgent:
             api_key: Google API key for Gemini. If not provided, will use GOOGLE_API_KEY env var.
         """
         self.api_key = api_key or os.getenv('GOOGLE_API_KEY')
-        self.model = None
+        self.client = None
         
         if genai and self.api_key:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
+            self.client = genai.Client(api_key=self.api_key)
 
     async def analyze(self, query: str) -> str:
         """Analyze investment-related queries.
@@ -42,7 +43,7 @@ class InvestmentAgent:
         Returns:
             Investment analysis or advice.
         """
-        if self.model:
+        if self.client:
             # Use Gemini for AI-powered analysis
             prompt = f"""You are an investment advisor agent. Provide professional, 
 informative responses about investment strategies, financial markets, and portfolio management.
@@ -53,7 +54,10 @@ Provide a clear, helpful response focused on investment strategy and financial a
 Include relevant considerations like risk management, diversification, and market trends where appropriate."""
             
             try:
-                response = self.model.generate_content(prompt)
+                response = self.client.models.generate_content(
+                    model='gemini-2.0-flash-exp',
+                    contents=prompt
+                )
                 return response.text
             except Exception as e:
                 return f"Error generating AI response: {str(e)}. Please provide a GOOGLE_API_KEY environment variable."
@@ -181,14 +185,10 @@ class InvestmentAgentExecutor(AgentExecutor):
         """
         # Extract the user's query from the context
         user_query = ""
-        if context.input_messages:
-            for message in context.input_messages:
-                if message.content and isinstance(message.content, list):
-                    for content_part in message.content:
-                        if hasattr(content_part, 'text'):
-                            user_query += content_part.text + " "
-                elif hasattr(message, 'text'):
-                    user_query += message.text + " "
+        if context.message and context.message.parts:
+            for part in context.message.parts:
+                if hasattr(part, 'text') and part.text:
+                    user_query += part.text + " "
         
         user_query = user_query.strip()
         if not user_query:

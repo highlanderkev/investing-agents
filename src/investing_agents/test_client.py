@@ -5,14 +5,14 @@ This script demonstrates how to interact with the investment agent using the A2A
 
 import asyncio
 import sys
-from typing import Optional
+from uuid import uuid4
 
 import httpx
-from a2a.client.client import A2AClient
-from a2a.types import ClientMessage, TextContentPart, UserMessage
+from a2a.client import A2ACardResolver, A2AClient
+from a2a.types import MessageSendParams, SendStreamingMessageRequest
 
 
-async def test_investment_agent(query: str, agent_url: str = "http://localhost:8000/") -> None:
+async def test_investment_agent(query: str, agent_url: str = "http://localhost:8000") -> None:
     """Test the investment agent with a query.
     
     Args:
@@ -27,15 +27,14 @@ async def test_investment_agent(query: str, agent_url: str = "http://localhost:8
     
     try:
         async with httpx.AsyncClient() as http_client:
-            # Create the A2A client
-            client = A2AClient(
-                agent_url=agent_url,
-                http_client=http_client,
-            )
-            
             # Get the agent card first
             print("Fetching agent card...")
-            agent_card = await client.get_agent_card()
+            resolver = A2ACardResolver(
+                httpx_client=http_client,
+                base_url=agent_url,
+            )
+            
+            agent_card = await resolver.get_agent_card()
             print(f"✓ Connected to: {agent_card.name}")
             print(f"  Description: {agent_card.description}")
             print(f"  Version: {agent_card.version}")
@@ -44,10 +43,26 @@ async def test_investment_agent(query: str, agent_url: str = "http://localhost:8
                 print(f"    - {skill.name}: {skill.description}")
             print()
             
+            # Create the A2A client
+            client = A2AClient(
+                httpx_client=http_client,
+                agent_card=agent_card
+            )
+            
             # Create a message to send to the agent
-            message = ClientMessage(
-                role='user',
-                content=[TextContentPart(text=query)]
+            send_message_payload = {
+                'message': {
+                    'role': 'user',
+                    'parts': [
+                        {'kind': 'text', 'text': query}
+                    ],
+                    'messageId': uuid4().hex,
+                },
+            }
+            
+            streaming_request = SendStreamingMessageRequest(
+                id=str(uuid4()),
+                params=MessageSendParams(**send_message_payload)
             )
             
             # Send the task and stream the response
@@ -56,13 +71,16 @@ async def test_investment_agent(query: str, agent_url: str = "http://localhost:8
             print(f"{'-'*70}")
             
             full_response = ""
-            async for event in client.task_new_iter([message]):
-                if hasattr(event, 'content') and event.content:
-                    for content_part in event.content:
-                        if hasattr(content_part, 'text'):
-                            text = content_part.text
-                            print(text, end='', flush=True)
-                            full_response += text
+            stream_response = client.send_message_streaming(streaming_request)
+            
+            async for chunk in stream_response:
+                if hasattr(chunk, 'result') and chunk.result:
+                    message = chunk.result
+                    if hasattr(message, 'parts') and message.parts:
+                        for part in message.parts:
+                            if hasattr(part, 'text') and part.text:
+                                print(part.text, end='', flush=True)
+                                full_response += part.text
             
             print(f"\n{'-'*70}\n")
             print(f"✓ Query completed successfully")
@@ -74,10 +92,12 @@ async def test_investment_agent(query: str, agent_url: str = "http://localhost:8
         sys.exit(1)
     except Exception as e:
         print(f"✗ Error: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
-async def run_interactive_mode(agent_url: str = "http://localhost:8000/") -> None:
+async def run_interactive_mode(agent_url: str = "http://localhost:8000") -> None:
     """Run the client in interactive mode.
     
     Args:
@@ -118,8 +138,8 @@ async def main():
     )
     parser.add_argument(
         '--url',
-        default='http://localhost:8000/',
-        help='URL of the investment agent server (default: http://localhost:8000/)'
+        default='http://localhost:8000',
+        help='URL of the investment agent server (default: http://localhost:8000)'
     )
     parser.add_argument(
         '--query',
