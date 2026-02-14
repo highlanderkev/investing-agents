@@ -187,8 +187,9 @@ class InvestmentAgentExecutor(AgentExecutor):
         user_query = ""
         if context.message and context.message.parts:
             for part in context.message.parts:
-                if hasattr(part, 'text') and part.text:
-                    user_query += part.text + " "
+                # Part is a RootModel, so we need to access part.root
+                if hasattr(part, 'root') and hasattr(part.root, 'text') and part.root.text:
+                    user_query += part.root.text + " "
         
         user_query = user_query.strip()
         if not user_query:

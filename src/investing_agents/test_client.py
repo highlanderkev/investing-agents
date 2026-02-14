@@ -70,19 +70,12 @@ async def test_investment_agent(query: str, agent_url: str = "http://localhost:8
             print(f"Response:")
             print(f"{'-'*70}")
             
-            full_response = ""
             stream_response = client.send_message_streaming(streaming_request)
             
             async for chunk in stream_response:
-                if hasattr(chunk, 'result') and chunk.result:
-                    message = chunk.result
-                    if hasattr(message, 'parts') and message.parts:
-                        for part in message.parts:
-                            if hasattr(part, 'text') and part.text:
-                                print(part.text, end='', flush=True)
-                                full_response += part.text
+                print(chunk.model_dump(mode='json', exclude_none=True))
             
-            print(f"\n{'-'*70}\n")
+            print(f"{'-'*70}\n")
             print(f"✓ Query completed successfully")
             
     except httpx.ConnectError:
