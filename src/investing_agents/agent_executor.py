@@ -6,7 +6,6 @@ and provides financial analysis using AI.
 
 import os
 import textwrap
-from typing import Optional
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
@@ -14,15 +13,13 @@ from a2a.utils import new_agent_text_message
 
 try:
     from google import genai
-    from google.genai import types
 except ImportError:
     genai = None
-    types = None
 
 
 # Prompt template for AI-powered analysis
 INVESTMENT_ADVISOR_PROMPT = textwrap.dedent("""
-    You are an investment advisor agent. Provide professional, 
+    You are an investment advisor agent. Provide professional,
     informative responses about investment strategies, financial markets, and portfolio management.
 
     User query: {query}
@@ -35,35 +32,34 @@ INVESTMENT_ADVISOR_PROMPT = textwrap.dedent("""
 class InvestmentAgent:
     """Investment strategy agent that provides financial analysis and advice."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """Initialize the investment agent.
-        
+
         Args:
             api_key: Google API key for Gemini. If not provided, will use GOOGLE_API_KEY env var.
         """
-        self.api_key = api_key or os.getenv('GOOGLE_API_KEY')
+        self.api_key = api_key or os.getenv("GOOGLE_API_KEY")
         self.client = None
-        
+
         if genai and self.api_key:
             self.client = genai.Client(api_key=self.api_key)
 
     async def analyze(self, query: str) -> str:
         """Analyze investment-related queries.
-        
+
         Args:
             query: The investment question or request from the user.
-            
+
         Returns:
             Investment analysis or advice.
         """
         if self.client:
             # Use Gemini for AI-powered analysis
             prompt = INVESTMENT_ADVISOR_PROMPT.format(query=query)
-            
+
             try:
                 response = self.client.models.generate_content(
-                    model='gemini-2.0-flash-exp',
-                    contents=prompt
+                    model="gemini-2.0-flash-exp", contents=prompt
                 )
                 return response.text
             except Exception as e:
@@ -71,19 +67,19 @@ class InvestmentAgent:
         else:
             # Fallback to basic responses if Gemini is not available
             return self._get_basic_response(query)
-    
+
     def _get_basic_response(self, query: str) -> str:
         """Provide basic investment advice without AI.
-        
+
         Args:
             query: The investment question.
-            
+
         Returns:
             Basic investment guidance.
         """
         query_lower = query.lower()
-        
-        if any(word in query_lower for word in ['diversif', 'portfolio', 'allocat']):
+
+        if any(word in query_lower for word in ["diversif", "portfolio", "allocat"]):
             return """Investment Portfolio Diversification Advice:
 
 1. **Asset Allocation**: Consider spreading investments across different asset classes:
@@ -93,7 +89,7 @@ class InvestmentAgent:
    - Cash equivalents for liquidity
 
 2. **Geographic Diversification**: Don't limit yourself to domestic markets
-   
+
 3. **Sector Diversification**: Invest across various industries to reduce sector-specific risk
 
 4. **Risk Assessment**: Align your portfolio with your risk tolerance and investment timeline
@@ -102,7 +98,7 @@ class InvestmentAgent:
 
 Remember: Past performance doesn't guarantee future results. Consider consulting with a financial advisor for personalized advice."""
 
-        elif any(word in query_lower for word in ['risk', 'safe', 'conserv']):
+        elif any(word in query_lower for word in ["risk", "safe", "conserv"]):
             return """Risk Management in Investing:
 
 1. **Understand Your Risk Tolerance**: Consider your age, income, financial goals, and comfort with volatility
@@ -125,14 +121,14 @@ Remember: Past performance doesn't guarantee future results. Consider consulting
 
 Always assess your personal financial situation before making investment decisions."""
 
-        elif any(word in query_lower for word in ['stock', 'equity', 'share']):
+        elif any(word in query_lower for word in ["stock", "equity", "share"]):
             return """Stock Market Investment Guidance:
 
-1. **Research Before Investing**: 
+1. **Research Before Investing**:
    - Company fundamentals (earnings, revenue, debt)
    - Industry trends and competitive position
    - Management quality
-   
+
 2. **Investment Approaches**:
    - Value investing: Undervalued stocks with strong fundamentals
    - Growth investing: Companies with high growth potential
@@ -171,9 +167,9 @@ Disclaimer: This information is for educational purposes only and should not be 
 class InvestmentAgentExecutor(AgentExecutor):
     """Agent executor for investment strategy agent."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """Initialize the executor.
-        
+
         Args:
             api_key: Google API key for Gemini integration.
         """
@@ -185,7 +181,7 @@ class InvestmentAgentExecutor(AgentExecutor):
         event_queue: EventQueue,
     ) -> None:
         """Execute the investment agent with the given context.
-        
+
         Args:
             context: The request context containing user input.
             event_queue: Queue for sending events back to the client.
@@ -195,26 +191,26 @@ class InvestmentAgentExecutor(AgentExecutor):
         if context.message and context.message.parts:
             for part in context.message.parts:
                 # Part is a RootModel, so we need to access part.root
-                if hasattr(part, 'root') and hasattr(part.root, 'text') and part.root.text:
+                if hasattr(part, "root") and hasattr(part.root, "text") and part.root.text:
                     user_query += part.root.text + " "
-        
+
         user_query = user_query.strip()
         if not user_query:
             user_query = "Hello, what can you help me with?"
-        
+
         # Get the investment analysis
         result = await self.agent.analyze(user_query)
-        
+
         # Send the result back through the event queue
         await event_queue.enqueue_event(new_agent_text_message(result))
 
-    async def cancel(
+    async def cancel(  # noqa: ARG002
         self, context: RequestContext, event_queue: EventQueue
     ) -> None:
         """Cancel the current execution.
-        
+
         Args:
             context: The request context.
             event_queue: Queue for sending events.
         """
-        raise Exception('Cancel operation is not supported for this agent')
+        raise Exception("Cancel operation is not supported for this agent")
