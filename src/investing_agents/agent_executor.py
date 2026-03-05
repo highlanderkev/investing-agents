@@ -13,10 +13,8 @@ from a2a.utils import new_agent_text_message
 
 try:
     from google import genai
-    from google.genai import types
 except ImportError:
     genai = None
-    types = None
 
 
 # Prompt template for AI-powered analysis
