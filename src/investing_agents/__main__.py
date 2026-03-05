@@ -81,7 +81,7 @@ def create_agent_card(url: str = "http://localhost:8000/") -> AgentCard:
         id="stock_analysis",
         name="Stock Analysis",
         description="Provides insights on specific stocks, equity analysis, and company fundamentals",
-        tags=["stocks", "equity", "market analysis", "trading"],
+        tags=["company analysis", "fundamentals", "sentiment analysis", "trading"],
         examples=[
             "What do you think about investing in Apple stock?",
             "How much should I invest in technology stocks?",

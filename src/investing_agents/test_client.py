@@ -135,11 +135,6 @@ async def main():
         "--query",
         help="Single query to send to the agent. If not provided, runs in interactive mode.",
     )
-    parser.add_argument(
-        "--interactive",
-        action="store_true",
-        help="Run in interactive mode (default if no --query provided)",
-    )
 
     args = parser.parse_args()
 
