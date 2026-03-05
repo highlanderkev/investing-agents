@@ -91,9 +91,11 @@ def create_agent_card(url: str = "http://localhost:8000/") -> AgentCard:
     # Create the agent card
     agent_card = AgentCard(
         name="Investment Strategy Agent",
-        description="An AI-powered agent that provides investment advice, portfolio management guidance, "
-        "risk analysis, and market insights. Helps users make informed investment decisions "
-        "through comprehensive financial analysis.",
+        description=(
+            "An AI-powered agent that provides investment advice, portfolio management guidance, "
+            "risk analysis, and market insights. Helps users make informed investment decisions "
+            "through comprehensive financial analysis."
+        ),
         url=url,
         version="0.1.0",
         default_input_modes=["text"],
