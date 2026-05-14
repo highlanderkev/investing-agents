@@ -23,10 +23,20 @@ try:
     from a2a.types import Message, Part, Role
 
     _USES_PYDANTIC_TYPES = True
+    _PROTO_TEXT_PART_TYPE = None
+    _PROTO_TEXT_FIELD_IS_MESSAGE = False
 except ImportError:
     from a2a.types.a2a_pb2 import Message, Part, Role
+    try:
+        from a2a.types.a2a_pb2 import TextPart as _ProtoTextPart
+    except ImportError:
+        _ProtoTextPart = None
 
     _USES_PYDANTIC_TYPES = False
+    _PROTO_TEXT_PART_TYPE = _ProtoTextPart
+    _PROTO_TEXT_FIELD_IS_MESSAGE = (
+        Part.DESCRIPTOR.fields_by_name["text"].message_type is not None
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +80,19 @@ def _build_agent_text_message(text: str):
     return Message(
         message_id=str(uuid.uuid4()),
         role=Role.Value("ROLE_AGENT"),
-        parts=[Part(text=text)],
+        parts=[
+            Part(
+                text=(
+                    (
+                        _PROTO_TEXT_PART_TYPE(text=text)
+                        if _PROTO_TEXT_PART_TYPE is not None
+                        else {"text": text}
+                    )
+                    if _PROTO_TEXT_FIELD_IS_MESSAGE
+                    else text
+                )
+            )
+        ],
     )
 
 
