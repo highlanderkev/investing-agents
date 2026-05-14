@@ -11,9 +11,35 @@ import uuid
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
-from a2a.utils import new_agent_text_message
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
+
+try:
+    from a2a.utils import new_agent_text_message as _new_agent_text_message
+except ImportError:
+    _new_agent_text_message = None
+
+try:
+    from a2a.types import Message, Part, Role
+
+    _USES_PYDANTIC_TYPES = True
+    _PROTO_TEXT_PART_TYPE = None
+    _PROTO_TEXT_FIELD_IS_MESSAGE = False
+except ImportError:
+    from a2a.types.a2a_pb2 import Message, Part, Role
+
+    try:
+        from a2a.types.a2a_pb2 import TextPart as _ProtoTextPart
+    except ImportError:
+        _ProtoTextPart = None
+
+    _USES_PYDANTIC_TYPES = False
+    _PROTO_TEXT_PART_TYPE = _ProtoTextPart
+    _part_descriptor = getattr(Part, "DESCRIPTOR", None)
+    _part_text_field = getattr(_part_descriptor, "fields_by_name", {}).get("text")
+    _PROTO_TEXT_FIELD_IS_MESSAGE = bool(
+        _part_text_field and _part_text_field.message_type is not None
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +66,39 @@ _DEFAULT_MODELS: dict[str, str] = {
     "azure": "gpt-4o-mini",
     "ollama": "llama3.2",
 }
+
+
+def _build_agent_text_message(text: str):
+    """Create an agent text message across supported a2a-sdk versions."""
+    if _new_agent_text_message is not None:
+        return _new_agent_text_message(text)
+
+    if _USES_PYDANTIC_TYPES:
+        return Message(
+            message_id=str(uuid.uuid4()),
+            role=Role.agent,
+            parts=[Part(root={"kind": "text", "text": text})],
+        )
+
+    return Message(
+        message_id=str(uuid.uuid4()),
+        role=Role.Value("ROLE_AGENT"),
+        parts=[Part(text=_build_protobuf_text_part(text))],
+    )
+
+
+def _build_protobuf_text_part(text: str):
+    """Build protobuf text part payload for supported protobuf schemas.
+
+    Returns:
+        Text payload for `Part.text` as either a protobuf `TextPart`, a dict payload,
+        or a scalar string, depending on the installed `a2a-sdk` protobuf schema.
+    """
+    if _PROTO_TEXT_FIELD_IS_MESSAGE:
+        if _PROTO_TEXT_PART_TYPE is not None:
+            return _PROTO_TEXT_PART_TYPE(text=text)
+        return {"text": text}
+    return text
 
 
 def _build_llm() -> BaseChatModel | None:
@@ -319,11 +378,7 @@ class InvestmentAgentExecutor(AgentExecutor):
         result = await self.agent.analyze(user_query)
 
         # Send the result back through the event queue
-        response = Message(
-            message_id=str(uuid.uuid4()),
-            role=Role.Value("ROLE_AGENT"),
-            parts=[Part(text=result)],
-        )
+        response = _build_agent_text_message(result)
         await event_queue.enqueue_event(response)
 
     async def cancel(  # noqa: ARG002
