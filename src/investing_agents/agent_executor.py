@@ -10,7 +10,7 @@ import uuid
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
-from a2a.types.a2a_pb2 import Message, Part, Role
+from a2a.utils import new_agent_text_message
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 
