@@ -4,6 +4,7 @@ This module implements the agent executor that handles investment-related querie
 and provides financial analysis using AI.
 """
 
+import logging
 import os
 import textwrap
 import uuid
@@ -13,6 +14,8 @@ from a2a.server.events import EventQueue
 from a2a.utils import new_agent_text_message
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
+
+logger = logging.getLogger(__name__)
 
 # Prompt template for AI-powered analysis
 INVESTMENT_ADVISOR_SYSTEM_PROMPT = textwrap.dedent("""
@@ -59,40 +62,70 @@ def _build_llm() -> BaseChatModel | None:
     if provider == "openai":
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
+            logger.warning(
+                "LLM_PROVIDER is set to 'openai' but OPENAI_API_KEY environment variable is not set"
+            )
             return None
         try:
             from langchain_openai import ChatOpenAI  # noqa: PLC0415
 
             return ChatOpenAI(model=model, api_key=api_key)
         except ImportError:
+            logger.warning(
+                "LLM_PROVIDER is set to 'openai' but langchain-openai package is not installed. "
+                "Install it with: pip install langchain-openai"
+            )
             return None
 
     if provider == "anthropic":
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
+            logger.warning(
+                "LLM_PROVIDER is set to 'anthropic' but ANTHROPIC_API_KEY environment variable is not set"
+            )
             return None
         try:
             from langchain_anthropic import ChatAnthropic  # noqa: PLC0415
 
             return ChatAnthropic(model=model, api_key=api_key)
         except ImportError:
+            logger.warning(
+                "LLM_PROVIDER is set to 'anthropic' but langchain-anthropic package is not installed. "
+                "Install it with: pip install langchain-anthropic"
+            )
             return None
 
     if provider == "google":
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
+            logger.warning(
+                "LLM_PROVIDER is set to 'google' but GOOGLE_API_KEY environment variable is not set"
+            )
             return None
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI  # noqa: PLC0415
 
             return ChatGoogleGenerativeAI(model=model, google_api_key=api_key)
         except ImportError:
+            logger.warning(
+                "LLM_PROVIDER is set to 'google' but langchain-google-genai package is not installed. "
+                "Install it with: pip install langchain-google-genai"
+            )
             return None
 
     if provider == "azure":
         api_key = os.getenv("AZURE_OPENAI_API_KEY")
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         if not api_key or not endpoint:
+            missing = []
+            if not api_key:
+                missing.append("AZURE_OPENAI_API_KEY")
+            if not endpoint:
+                missing.append("AZURE_OPENAI_ENDPOINT")
+            logger.warning(
+                "LLM_PROVIDER is set to 'azure' but required environment variable(s) not set: %s",
+                ", ".join(missing),
+            )
             return None
         try:
             from langchain_openai import AzureChatOpenAI  # noqa: PLC0415
@@ -103,6 +136,10 @@ def _build_llm() -> BaseChatModel | None:
                 azure_endpoint=endpoint,
             )
         except ImportError:
+            logger.warning(
+                "LLM_PROVIDER is set to 'azure' but langchain-openai package is not installed. "
+                "Install it with: pip install langchain-openai"
+            )
             return None
 
     if provider == "ollama":
@@ -112,8 +149,17 @@ def _build_llm() -> BaseChatModel | None:
 
             return ChatOllama(model=model, base_url=base_url)
         except ImportError:
+            logger.warning(
+                "LLM_PROVIDER is set to 'ollama' but langchain-ollama package is not installed. "
+                "Install it with: pip install langchain-ollama"
+            )
             return None
 
+    logger.warning(
+        "LLM_PROVIDER is set to '%s' which is not a recognized provider. "
+        "Supported providers: openai, anthropic, google, azure, ollama",
+        provider,
+    )
     return None
 
 
