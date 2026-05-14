@@ -88,7 +88,12 @@ def _build_agent_text_message(text: str):
 
 
 def _build_protobuf_text_part(text: str):
-    """Build protobuf text part payload for supported protobuf schemas."""
+    """Build protobuf text part payload for supported protobuf schemas.
+
+    Returns:
+        Text payload for `Part.text` as either a protobuf `TextPart`, a dict payload,
+        or a scalar string, depending on the installed `a2a-sdk` protobuf schema.
+    """
     if _PROTO_TEXT_FIELD_IS_MESSAGE:
         if _PROTO_TEXT_PART_TYPE is not None:
             return _PROTO_TEXT_PART_TYPE(text=text)
