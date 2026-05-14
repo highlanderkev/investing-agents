@@ -137,13 +137,15 @@ def main():
         http_handler=request_handler,
     )
 
+    llm_provider = os.getenv("LLM_PROVIDER")
+
     print(f"Starting Investment Strategy A2A Server on {host}:{port}")
     print(f"Server URL: {server_url}")
-    if google_api_key:
-        print("✓ Google API Key configured - Gemini AI enabled")
+    if llm_provider:
+        print(f"✓ LLM provider configured: {llm_provider}")
     else:
-        print("⚠ No Google API Key found - Using basic responses")
-        print("  Set GOOGLE_API_KEY environment variable to enable AI-powered analysis")
+        print("⚠ No LLM provider configured - using basic responses")
+        print("  Set LLM_PROVIDER (openai, anthropic, google, azure, ollama) to enable AI-powered analysis")
 
     # Run the server
     uvicorn.run(server.build(), host=host, port=port)

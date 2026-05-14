@@ -160,7 +160,14 @@ The server will start on `http://localhost:8000` by default.
 ```
 Starting Investment Strategy A2A Server on 0.0.0.0:8000
 Server URL: http://localhost:8000/
+✓ LLM provider configured: openai
 ```
+
+> If `LLM_PROVIDER` is not set the server still starts but uses built-in rule-based responses:
+> ```
+> ⚠ No LLM provider configured - using basic responses
+>   Set LLM_PROVIDER (openai, anthropic, google, azure, ollama) to enable AI-powered analysis
+> ```
 
 ### Testing with the Example Client
 

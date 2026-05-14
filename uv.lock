@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -498,6 +498,9 @@ all = [
 anthropic = [
     { name = "langchain-anthropic" },
 ]
+azure = [
+    { name = "langchain-openai" },
+]
 google = [
     { name = "langchain-google-genai" },
 ]
@@ -527,12 +530,13 @@ requires-dist = [
     { name = "langchain-ollama", marker = "extra == 'all'", specifier = ">=0.3.0" },
     { name = "langchain-ollama", marker = "extra == 'ollama'", specifier = ">=0.3.0" },
     { name = "langchain-openai", marker = "extra == 'all'", specifier = ">=0.3.0" },
+    { name = "langchain-openai", marker = "extra == 'azure'", specifier = ">=0.3.0" },
     { name = "langchain-openai", marker = "extra == 'openai'", specifier = ">=0.3.0" },
     { name = "pydantic", specifier = ">=2.11.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "uvicorn", specifier = ">=0.34.0" },
 ]
-provides-extras = ["openai", "anthropic", "google", "ollama", "all"]
+provides-extras = ["openai", "azure", "anthropic", "google", "ollama", "all"]
 
 [package.metadata.requires-dev]
 dev = [
