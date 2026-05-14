@@ -15,6 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 openai = ["langchain-openai>=0.3.0"]
+azure = ["langchain-openai>=0.3.0"]
 anthropic = ["langchain-anthropic>=0.3.0"]
 google = ["langchain-google-genai>=2.0.0"]
 ollama = ["langchain-ollama>=0.3.0"]
