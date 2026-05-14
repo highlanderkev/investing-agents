@@ -27,6 +27,7 @@ try:
     _PROTO_TEXT_FIELD_IS_MESSAGE = False
 except ImportError:
     from a2a.types.a2a_pb2 import Message, Part, Role
+
     try:
         from a2a.types.a2a_pb2 import TextPart as _ProtoTextPart
     except ImportError:
@@ -34,8 +35,10 @@ except ImportError:
 
     _USES_PYDANTIC_TYPES = False
     _PROTO_TEXT_PART_TYPE = _ProtoTextPart
-    _PROTO_TEXT_FIELD_IS_MESSAGE = (
-        Part.DESCRIPTOR.fields_by_name["text"].message_type is not None
+    _part_descriptor = getattr(Part, "DESCRIPTOR", None)
+    _part_text_field = getattr(_part_descriptor, "fields_by_name", {}).get("text")
+    _PROTO_TEXT_FIELD_IS_MESSAGE = bool(
+        _part_text_field and _part_text_field.message_type is not None
     )
 
 logger = logging.getLogger(__name__)
@@ -80,20 +83,17 @@ def _build_agent_text_message(text: str):
     return Message(
         message_id=str(uuid.uuid4()),
         role=Role.Value("ROLE_AGENT"),
-        parts=[
-            Part(
-                text=(
-                    (
-                        _PROTO_TEXT_PART_TYPE(text=text)
-                        if _PROTO_TEXT_PART_TYPE is not None
-                        else {"text": text}
-                    )
-                    if _PROTO_TEXT_FIELD_IS_MESSAGE
-                    else text
-                )
-            )
-        ],
+        parts=[Part(text=_build_protobuf_text_part(text))],
     )
+
+
+def _build_protobuf_text_part(text: str):
+    """Build protobuf text part payload for supported protobuf schemas."""
+    if _PROTO_TEXT_FIELD_IS_MESSAGE:
+        if _PROTO_TEXT_PART_TYPE is not None:
+            return _PROTO_TEXT_PART_TYPE(text=text)
+        return {"text": text}
+    return text
 
 
 def _build_llm() -> BaseChatModel | None:
