@@ -205,9 +205,9 @@ The agent provides five main skills:
 
 1. **Portfolio Management and Diversification**
 2. **Investment Risk Analysis**  
-3. **Market and Stock Analysis**
+3. **Market and Stock Analysis** — broader market trends, sectors, and equity market conditions
 4. **Investment Planning and Strategy**
-5. **Stock Analysis**
+5. **Stock Analysis** — company-specific fundamentals, valuation, and sentiment for individual stocks
 
 ### Using with Other A2A Clients
 
