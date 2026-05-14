@@ -32,3 +32,10 @@ def test_build_llm_unknown_provider_returns_none(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "not-a-provider")
     monkeypatch.delenv("LLM_MODEL", raising=False)
     assert _build_llm() is None
+
+
+def test_build_llm_openai_without_api_key_returns_none(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("LLM_MODEL", "gpt-4o-mini")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert _build_llm() is None
