@@ -10,8 +10,9 @@ This project implements an A2A-compliant agent for investment and financial stra
 - ⚖️ **Risk Analysis**: Assess investment risk and recommend risk management approaches  
 - 📈 **Market Analysis**: Offer insights on stock market investing and equity analysis
 - 📊 **Financial Planning**: Guide long-term investment planning and goal setting
+- 🔍 **Stock Analysis**: Analyze specific stocks, company fundamentals, and sentiment
 
-The agent uses Google's Gemini AI (when configured) for intelligent, context-aware responses, and falls back to structured guidance when AI is not available.
+The agent uses [LangChain](https://python.langchain.com/) to integrate with multiple LLM providers (OpenAI, Anthropic, Google Gemini, Azure OpenAI, and Ollama) for intelligent, context-aware responses, and falls back to structured guidance when no AI provider is configured.
 
 ## Architecture
 
@@ -26,7 +27,7 @@ This implementation follows the A2A protocol specification and is based on the [
 
 - Python 3.12 or higher
 - [UV](https://docs.astral.sh/uv/) package manager
-- (Optional) Google API Key for Gemini AI integration
+- (Optional) An API key for at least one supported LLM provider (OpenAI, Anthropic, Google, Azure OpenAI) or a running [Ollama](https://ollama.com/) instance
 
 ## Installation
 
@@ -46,23 +47,86 @@ This implementation follows the A2A protocol specification and is based on the [
    uv sync
    ```
 
+   To enable a specific LLM provider, install its optional extra:
+
+   | Provider | Command |
+   |---|---|
+   | OpenAI | `uv sync --extra openai` |
+   | Anthropic | `uv sync --extra anthropic` |
+   | Google (Gemini) | `uv sync --extra google` |
+   | Azure OpenAI | `uv sync --extra azure` |
+   | Ollama | `uv sync --extra ollama` |
+   | All providers | `uv sync --extra all` |
+
 ## Configuration
 
 ### Optional: Enable AI-Powered Analysis
 
-To enable Gemini AI for more intelligent responses:
+The agent uses LangChain to support multiple LLM providers. Set `LLM_PROVIDER` to one of the supported values and supply the corresponding credentials.
 
-1. Get a Google API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+#### OpenAI
 
-2. Set the environment variable:
-   ```bash
-   export GOOGLE_API_KEY="your-api-key-here"
-   ```
+```bash
+export LLM_PROVIDER=openai
+export OPENAI_API_KEY="your-api-key-here"
+```
 
-3. Or create a `.env` file:
-   ```bash
-   echo "GOOGLE_API_KEY=your-api-key-here" > .env
-   ```
+#### Anthropic
+
+```bash
+export LLM_PROVIDER=anthropic
+export ANTHROPIC_API_KEY="your-api-key-here"
+```
+
+#### Google (Gemini)
+
+```bash
+export LLM_PROVIDER=google
+export GOOGLE_API_KEY="your-api-key-here"
+```
+
+Get a Google API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
+
+#### Azure OpenAI
+
+```bash
+export LLM_PROVIDER=azure
+export AZURE_OPENAI_API_KEY="your-api-key-here"
+export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
+```
+
+#### Ollama (local)
+
+```bash
+export LLM_PROVIDER=ollama
+# Optionally override the base URL (default: http://localhost:11434)
+export OLLAMA_BASE_URL="http://localhost:11434"
+```
+
+#### Model Override
+
+To use a model other than the provider default, set `LLM_MODEL`:
+
+```bash
+export LLM_MODEL="gpt-4o"
+```
+
+Default models per provider:
+
+| Provider | Default Model |
+|---|---|
+| openai | `gpt-4o-mini` |
+| anthropic | `claude-3-5-haiku-20241022` |
+| google | `gemini-2.0-flash` |
+| azure | `gpt-4o-mini` |
+| ollama | `llama3.2` |
+
+You can also store your configuration in a `.env` file instead of setting environment variables:
+
+```bash
+LLM_PROVIDER=openai
+OPENAI_API_KEY=your-api-key-here
+```
 
 ### Server Configuration
 
@@ -71,7 +135,14 @@ Configure the server using environment variables:
 - `HOST`: Server host (default: `0.0.0.0`)
 - `PORT`: Server port (default: `8000`)
 - `SERVER_URL`: Public URL for the agent card (default: `http://localhost:8000/`)
-- `GOOGLE_API_KEY`: Google API key for Gemini (optional)
+- `LLM_PROVIDER`: LLM provider to use — `openai` (default), `anthropic`, `google`, `azure`, `ollama`
+- `LLM_MODEL`: Optional model name override for the selected provider
+- `OPENAI_API_KEY`: OpenAI API key (required when `LLM_PROVIDER=openai`)
+- `ANTHROPIC_API_KEY`: Anthropic API key (required when `LLM_PROVIDER=anthropic`)
+- `GOOGLE_API_KEY`: Google API key for Gemini (required when `LLM_PROVIDER=google`)
+- `AZURE_OPENAI_API_KEY`: Azure OpenAI API key (required when `LLM_PROVIDER=azure`)
+- `AZURE_OPENAI_ENDPOINT`: Azure OpenAI endpoint URL (required when `LLM_PROVIDER=azure`)
+- `OLLAMA_BASE_URL`: Ollama server URL (used when `LLM_PROVIDER=ollama`, default: `http://localhost:11434`)
 
 ## Usage
 
@@ -89,7 +160,6 @@ The server will start on `http://localhost:8000` by default.
 ```
 Starting Investment Strategy A2A Server on 0.0.0.0:8000
 Server URL: http://localhost:8000/
-✓ Google API Key configured - Gemini AI enabled
 ```
 
 ### Testing with the Example Client
@@ -131,12 +201,13 @@ curl http://localhost:8000/agent-card
 
 ### Skills
 
-The agent provides four main skills:
+The agent provides five main skills:
 
 1. **Portfolio Management and Diversification**
 2. **Investment Risk Analysis**  
 3. **Market and Stock Analysis**
 4. **Investment Planning and Strategy**
+5. **Stock Analysis**
 
 ### Using with Other A2A Clients
 
@@ -189,6 +260,11 @@ uv run ruff check src/
 - [A2A Python SDK](https://github.com/a2aproject/a2a-python)
 - [A2A Samples](https://github.com/a2aproject/a2a-samples)
 - [A2A Quickstart Notebook](https://github.com/a2aproject/a2a-samples/blob/main/notebooks/a2a_quickstart.ipynb)
+- [LangChain Documentation](https://python.langchain.com/)
+- [LangChain OpenAI Integration](https://python.langchain.com/docs/integrations/chat/openai/)
+- [LangChain Anthropic Integration](https://python.langchain.com/docs/integrations/chat/anthropic/)
+- [LangChain Google Generative AI Integration](https://python.langchain.com/docs/integrations/chat/google_generative_ai/)
+- [LangChain Ollama Integration](https://python.langchain.com/docs/integrations/chat/ollama/)
 
 ## Disclaimer
 
