@@ -118,13 +118,12 @@ def main():
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     server_url = os.getenv("SERVER_URL", f"http://localhost:{port}/")
-    google_api_key = os.getenv("GOOGLE_API_KEY")
 
     # Create the agent card
     agent_card = create_agent_card(url=server_url)
 
     # Create the agent executor
-    agent_executor = InvestmentAgentExecutor(api_key=google_api_key)
+    agent_executor = InvestmentAgentExecutor()
 
     # Create the request handler with task store
     request_handler = DefaultRequestHandler(

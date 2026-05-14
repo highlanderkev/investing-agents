@@ -4,45 +4,176 @@ This module implements the agent executor that handles investment-related querie
 and provides financial analysis using AI.
 """
 
+import logging
 import os
 import textwrap
+import uuid
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.utils import new_agent_text_message
+from langchain_core.language_models import BaseChatModel
+from langchain_core.prompts import ChatPromptTemplate
 
-try:
-    from google import genai
-except ImportError:
-    genai = None
-
+logger = logging.getLogger(__name__)
 
 # Prompt template for AI-powered analysis
-INVESTMENT_ADVISOR_PROMPT = textwrap.dedent("""
+INVESTMENT_ADVISOR_SYSTEM_PROMPT = textwrap.dedent("""
     You are an investment advisor agent. Provide professional,
     informative responses about investment strategies, financial markets, and portfolio management.
-
-    User query: {query}
-
     Provide a clear, helpful response focused on investment strategy and financial analysis.
     Include relevant considerations like risk management, diversification, and market trends where appropriate.
 """).strip()
+
+_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        ("system", INVESTMENT_ADVISOR_SYSTEM_PROMPT),
+        ("human", "{query}"),
+    ]
+)
+
+# Default models per provider
+_DEFAULT_MODELS: dict[str, str] = {
+    "openai": "gpt-4o-mini",
+    "anthropic": "claude-3-5-haiku-20241022",
+    "google": "gemini-2.0-flash",
+    "azure": "gpt-4o-mini",
+    "ollama": "llama3.2",
+}
+
+
+def _build_llm() -> BaseChatModel | None:
+    """Build a LangChain chat model based on environment configuration.
+
+    Reads:
+        LLM_PROVIDER  — one of: openai (default), anthropic, google, azure, ollama
+        LLM_MODEL     — optional model name override
+        OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY,
+        AZURE_OPENAI_API_KEY + AZURE_OPENAI_ENDPOINT,
+        OLLAMA_BASE_URL (default http://localhost:11434)
+
+    Returns:
+        A configured BaseChatModel, or None if required config is missing or
+        the provider package is not installed.
+    """
+    provider = os.getenv("LLM_PROVIDER", "openai").lower()
+    model = os.getenv("LLM_MODEL") or _DEFAULT_MODELS.get(provider)
+
+    if provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning(
+                "LLM_PROVIDER is set to 'openai' but OPENAI_API_KEY environment variable is not set"
+            )
+            return None
+        try:
+            from langchain_openai import ChatOpenAI  # noqa: PLC0415
+
+            return ChatOpenAI(model=model, api_key=api_key)
+        except ImportError:
+            logger.warning(
+                "LLM_PROVIDER is set to 'openai' but langchain-openai package is not installed. "
+                "Install it with: pip install langchain-openai"
+            )
+            return None
+
+    if provider == "anthropic":
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            logger.warning(
+                "LLM_PROVIDER is set to 'anthropic' but ANTHROPIC_API_KEY environment variable is not set"
+            )
+            return None
+        try:
+            from langchain_anthropic import ChatAnthropic  # noqa: PLC0415
+
+            return ChatAnthropic(model=model, api_key=api_key)
+        except ImportError:
+            logger.warning(
+                "LLM_PROVIDER is set to 'anthropic' but langchain-anthropic package is not installed. "
+                "Install it with: pip install langchain-anthropic"
+            )
+            return None
+
+    if provider == "google":
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            logger.warning(
+                "LLM_PROVIDER is set to 'google' but GOOGLE_API_KEY environment variable is not set"
+            )
+            return None
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI  # noqa: PLC0415
+
+            return ChatGoogleGenerativeAI(model=model, google_api_key=api_key)
+        except ImportError:
+            logger.warning(
+                "LLM_PROVIDER is set to 'google' but langchain-google-genai package is not installed. "
+                "Install it with: pip install langchain-google-genai"
+            )
+            return None
+
+    if provider == "azure":
+        api_key = os.getenv("AZURE_OPENAI_API_KEY")
+        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+        if not api_key or not endpoint:
+            missing = []
+            if not api_key:
+                missing.append("AZURE_OPENAI_API_KEY")
+            if not endpoint:
+                missing.append("AZURE_OPENAI_ENDPOINT")
+            logger.warning(
+                "LLM_PROVIDER is set to 'azure' but required environment variable(s) not set: %s",
+                ", ".join(missing),
+            )
+            return None
+        try:
+            from langchain_openai import AzureChatOpenAI  # noqa: PLC0415
+
+            return AzureChatOpenAI(
+                azure_deployment=model,
+                api_key=api_key,
+                azure_endpoint=endpoint,
+            )
+        except ImportError:
+            logger.warning(
+                "LLM_PROVIDER is set to 'azure' but langchain-openai package is not installed. "
+                "Install it with: pip install langchain-openai"
+            )
+            return None
+
+    if provider == "ollama":
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        try:
+            from langchain_ollama import ChatOllama  # noqa: PLC0415
+
+            return ChatOllama(model=model, base_url=base_url)
+        except ImportError:
+            logger.warning(
+                "LLM_PROVIDER is set to 'ollama' but langchain-ollama package is not installed. "
+                "Install it with: pip install langchain-ollama"
+            )
+            return None
+
+    logger.warning(
+        "LLM_PROVIDER is set to '%s' which is not a recognized provider. "
+        "Supported providers: openai, anthropic, google, azure, ollama",
+        provider,
+    )
+    return None
 
 
 class InvestmentAgent:
     """Investment strategy agent that provides financial analysis and advice."""
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self):
         """Initialize the investment agent.
 
-        Args:
-            api_key: Google API key for Gemini. If not provided, will use GOOGLE_API_KEY env var.
+        LLM provider and credentials are read from environment variables:
+            LLM_PROVIDER — openai (default), anthropic, google, azure, ollama
+            LLM_MODEL    — optional model name override
         """
-        self.api_key = api_key or os.getenv("GOOGLE_API_KEY")
-        self.client = None
-
-        if genai and self.api_key:
-            self.client = genai.Client(api_key=self.api_key)
+        self.llm = _build_llm()
 
     async def analyze(self, query: str) -> str:
         """Analyze investment-related queries.
@@ -53,19 +184,14 @@ class InvestmentAgent:
         Returns:
             Investment analysis or advice.
         """
-        if self.client:
-            # Use Gemini for AI-powered analysis
-            prompt = INVESTMENT_ADVISOR_PROMPT.format(query=query)
-
+        if self.llm:
+            chain = _PROMPT | self.llm
             try:
-                response = self.client.models.generate_content(
-                    model="gemini-2.0-flash-exp", contents=prompt
-                )
-                return response.text
+                response = await chain.ainvoke({"query": query})
+                return response.content
             except Exception as e:
-                return f"Error generating AI response: {str(e)}. Please provide a GOOGLE_API_KEY environment variable."
+                return f"Error generating AI response: {e}"
         else:
-            # Fallback to basic responses if Gemini is not available
             return self._get_basic_response(query)
 
     def _get_basic_response(self, query: str) -> str:
@@ -159,7 +285,7 @@ I can help you with:
 
 What specific investment topic would you like to explore?
 
-Note: For AI-powered personalized analysis, please configure the GOOGLE_API_KEY environment variable with your Google API key to enable Gemini integration.
+Note: For AI-powered personalized analysis, set the LLM_PROVIDER environment variable (openai, anthropic, google, azure, ollama) along with the corresponding API key to enable LLM integration.
 
 Disclaimer: This information is for educational purposes only and should not be considered as financial advice. Always consult with a qualified financial advisor before making investment decisions."""
 
@@ -167,13 +293,13 @@ Disclaimer: This information is for educational purposes only and should not be 
 class InvestmentAgentExecutor(AgentExecutor):
     """Agent executor for investment strategy agent."""
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self):
         """Initialize the executor.
 
-        Args:
-            api_key: Google API key for Gemini integration.
+        LLM provider and credentials are read from environment variables.
+        See InvestmentAgent for supported providers.
         """
-        self.agent = InvestmentAgent(api_key=api_key)
+        self.agent = InvestmentAgent()
 
     async def execute(
         self,
@@ -187,22 +313,18 @@ class InvestmentAgentExecutor(AgentExecutor):
             event_queue: Queue for sending events back to the client.
         """
         # Extract the user's query from the context
-        user_query = ""
-        if context.message and context.message.parts:
-            for part in context.message.parts:
-                # Part is a RootModel, so we need to access part.root
-                if hasattr(part, "root") and hasattr(part.root, "text") and part.root.text:
-                    user_query += part.root.text + " "
-
-        user_query = user_query.strip()
-        if not user_query:
-            user_query = "Hello, what can you help me with?"
+        user_query = context.get_user_input().strip() or "Hello, what can you help me with?"
 
         # Get the investment analysis
         result = await self.agent.analyze(user_query)
 
         # Send the result back through the event queue
-        await event_queue.enqueue_event(new_agent_text_message(result))
+        response = Message(
+            message_id=str(uuid.uuid4()),
+            role=Role.Value("ROLE_AGENT"),
+            parts=[Part(text=result)],
+        )
+        await event_queue.enqueue_event(response)
 
     async def cancel(  # noqa: ARG002
         self, context: RequestContext, event_queue: EventQueue
