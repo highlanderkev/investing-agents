@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -11,6 +12,8 @@ from uuid import uuid4
 import httpx
 from a2a.client import A2ACardResolver, A2AClient
 from a2a.types import MessageSendParams, SendStreamingMessageRequest
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -254,6 +257,11 @@ def _safe_model_dump(value: Any) -> Any:
         return value.model_dump(mode="json", exclude_none=True)
     if isinstance(value, (dict, list, str, int, float, bool)) or value is None:
         return value
+    logger.warning(
+        "Event object lacks model_dump and is not a basic JSON type; "
+        "falling back to repr(). Type: %s. This may cause text extraction to fail.",
+        type(value).__name__,
+    )
     return repr(value)
 
 
