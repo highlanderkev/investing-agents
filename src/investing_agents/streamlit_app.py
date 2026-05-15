@@ -459,7 +459,9 @@ def _row_to_result_like(row: dict[str, Any]):
             self.success = payload["success"]
             self.latency_ms = float(payload["latency_ms"])
             first_event_value = payload.get("first_event_ms")
-            self.first_event_ms = float(first_event_value) if first_event_value else None
+            self.first_event_ms = (
+                float(first_event_value) if first_event_value is not None else None
+            )
 
     return _ResultLike(row)
 

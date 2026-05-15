@@ -382,7 +382,9 @@ class InvestmentAgentExecutor(AgentExecutor):
         await event_queue.enqueue_event(response)
 
     async def cancel(
-        self, _context: RequestContext, _event_queue: EventQueue
+        self,
+        context: RequestContext,  # noqa: ARG002
+        event_queue: EventQueue,  # noqa: ARG002
     ) -> None:
         """Cancel the current execution.
 
