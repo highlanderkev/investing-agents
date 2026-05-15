@@ -95,14 +95,19 @@ async def run_prompt(
                 params=MessageSendParams(**payload),
             )
 
-            stream_response = client.send_message_streaming(request)
-            async for event in stream_response:
-                event_count += 1
-                event_payload = _safe_model_dump(event)
-                texts = extract_text_values(event_payload)
-                if texts and first_event_ms is None:
-                    first_event_ms = (time.perf_counter() - started) * 1000
-                chunks.extend(texts)
+            async def _consume_stream() -> None:
+                nonlocal event_count, first_event_ms
+
+                stream_response = client.send_message_streaming(request)
+                async for event in stream_response:
+                    event_count += 1
+                    event_payload = _safe_model_dump(event)
+                    texts = extract_text_values(event_payload)
+                    if texts and first_event_ms is None:
+                        first_event_ms = (time.perf_counter() - started) * 1000
+                    chunks.extend(texts)
+
+            await asyncio.wait_for(_consume_stream(), timeout=timeout_s)
 
         latency_ms = (time.perf_counter() - started) * 1000
         response_text = "\n".join(_dedupe_preserve_order(chunks)).strip()
@@ -255,7 +260,7 @@ def _safe_model_dump(value: Any) -> Any:
 def _normalize_error(exc: Exception) -> str:
     if isinstance(exc, httpx.ConnectError):
         return "Could not connect to agent server"
-    if isinstance(exc, httpx.TimeoutException):
+    if isinstance(exc, httpx.TimeoutException | TimeoutError):
         return "Timed out waiting for agent response"
     return f"{exc.__class__.__name__}: {exc}"
 
