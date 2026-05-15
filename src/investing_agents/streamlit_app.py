@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import atexit
+import contextlib
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 import streamlit as st
@@ -61,6 +65,12 @@ def _init_state() -> None:
     st.session_state.setdefault("last_compare_results", [])
     st.session_state.setdefault("evaluation_rows", [])
     st.session_state.setdefault("local_processes", {})
+    st.session_state.setdefault("log_dir", None)
+
+    # Register atexit handler once to clean up spawned processes
+    if not st.session_state.get("_atexit_registered"):
+        atexit.register(_cleanup_local_processes)
+        st.session_state["_atexit_registered"] = True
 
 
 def _render_sidebar() -> None:
@@ -143,6 +153,26 @@ def _render_sidebar() -> None:
                 process = proc_info["process"]
                 status = "running" if process.poll() is None else f"exited ({process.poll()})"
                 st.write(f"- {server_name}: {status} at {proc_info['url']}")
+
+                # Show log file paths if available
+                if "stdout_log" in proc_info and "stderr_log" in proc_info:
+                    with st.expander(f"Logs for {server_name}", expanded=False):
+                        st.text(f"stdout: {proc_info['stdout_log']}")
+                        st.text(f"stderr: {proc_info['stderr_log']}")
+
+                        # Show last few lines of stderr if process exited with error
+                        if process.poll() is not None and process.poll() != 0:
+                            try:
+                                stderr_path = Path(proc_info['stderr_log'])
+                                if stderr_path.exists():
+                                    stderr_content = stderr_path.read_text()
+                                    last_lines = stderr_content.strip().split('\n')[-10:]
+                                    if last_lines:
+                                        st.text("Last 10 lines of stderr:")
+                                        st.code('\n'.join(last_lines))
+                            except Exception:
+                                pass
+
                 if st.button(f"Stop {server_name}", key=f"stop_{server_name}"):
                     _stop_local_server(server_name)
                     st.rerun()
@@ -411,13 +441,38 @@ def _enabled_targets() -> list[AgentTarget]:
     return targets
 
 
+def _cleanup_local_processes() -> None:
+    """Terminate all tracked local server processes on exit."""
+    if "local_processes" not in st.session_state:
+        return
+
+    for alias, proc_info in list(st.session_state.local_processes.items()):
+        process = proc_info.get("process")
+        if process and process.poll() is None:
+            try:
+                process.terminate()
+                process.wait(timeout=2)
+            except (subprocess.TimeoutExpired, Exception):
+                # If terminate fails or times out, force kill
+                if process.poll() is None:
+                    with contextlib.suppress(Exception):
+                        process.kill()
+
+
 def _start_local_server(alias: str, provider: str, model: str, host: str, port: int) -> None:
     if alias in st.session_state.local_processes:
         st.warning(f"Server '{alias}' is already tracked.")
         return
 
+    # Create log directory if needed
+    if st.session_state.log_dir is None:
+        st.session_state.log_dir = Path(tempfile.mkdtemp(prefix="investing_agents_logs_"))
+
+    log_dir = st.session_state.log_dir
+    stdout_log = log_dir / f"{alias}_stdout.log"
+    stderr_log = log_dir / f"{alias}_stderr.log"
+
     env = {
-        **dict(**st.session_state.get("_env_copy", {})),
         **_get_os_environ(),
         "HOST": host,
         "PORT": str(port),
@@ -427,12 +482,13 @@ def _start_local_server(alias: str, provider: str, model: str, host: str, port: 
     if model:
         env["LLM_MODEL"] = model
 
-    process = subprocess.Popen(  # noqa: S603
-        [sys.executable, "-m", "investing_agents"],
-        env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    with stdout_log.open("w") as stdout_file, stderr_log.open("w") as stderr_file:
+        process = subprocess.Popen(  # noqa: S603
+            [sys.executable, "-m", "investing_agents"],
+            env=env,
+            stdout=stdout_file,
+            stderr=stderr_file,
+        )
 
     url = f"http://localhost:{port}"
     st.session_state.local_processes[alias] = {
@@ -440,10 +496,13 @@ def _start_local_server(alias: str, provider: str, model: str, host: str, port: 
         "url": url,
         "provider": provider,
         "started_at": time.time(),
+        "stdout_log": str(stdout_log),
+        "stderr_log": str(stderr_log),
     }
 
     st.session_state.targets.append({"name": alias, "url": url, "enabled": True})
     st.success(f"Started local server '{alias}' on {url}")
+    st.info(f"Logs: stdout={stdout_log}, stderr={stderr_log}")
 
 
 def _stop_local_server(alias: str) -> None:
