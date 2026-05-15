@@ -19,15 +19,24 @@ azure = ["langchain-openai>=0.3.0"]
 anthropic = ["langchain-anthropic>=0.3.0"]
 google = ["langchain-google-genai>=2.0.0"]
 ollama = ["langchain-ollama>=0.3.0"]
+ui = ["streamlit>=1.44.0"]
 all = [
     "langchain-openai>=0.3.0",
     "langchain-anthropic>=0.3.0",
     "langchain-google-genai>=2.0.0",
     "langchain-ollama>=0.3.0",
 ]
+all-ui = [
+    "langchain-openai>=0.3.0",
+    "langchain-anthropic>=0.3.0",
+    "langchain-google-genai>=2.0.0",
+    "langchain-ollama>=0.3.0",
+    "streamlit>=1.44.0",
+]
 
 [project.scripts]
 investing-agents = "investing_agents.__main__:main"
+investing-agents-ui = "investing_agents.streamlit_launcher:main"
 
 [build-system]
 requires = ["hatchling"]

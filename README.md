@@ -22,6 +22,8 @@ This implementation follows the A2A protocol specification and is based on the [
 - `agent_executor.py`: Core investment analysis logic and agent executor
 - `__main__.py`: A2A server setup with agent card and capabilities
 - `test_client.py`: Example client for testing the agent
+- `a2a_client_utils.py`: Shared A2A request/stream helpers used by UI workflows
+- `streamlit_app.py`: Streamlit frontend for chat, compare, and evaluation
 
 ## Prerequisites
 
@@ -56,7 +58,9 @@ This implementation follows the A2A protocol specification and is based on the [
    | Google (Gemini) | `uv sync --extra google` |
    | Azure OpenAI | `uv sync --extra azure` |
    | Ollama | `uv sync --extra ollama` |
+   | Streamlit UI only | `uv sync --extra ui` |
    | All providers | `uv sync --extra all` |
+   | All providers + Streamlit UI | `uv sync --extra all-ui` |
 
 ## Configuration
 
@@ -183,6 +187,36 @@ uv run python src/investing_agents/test_client.py --query "How should I diversif
 uv run python src/investing_agents/test_client.py --interactive
 ```
 
+### Streamlit Frontend
+
+Launch the interactive frontend:
+
+```bash
+uv run investing-agents-ui
+```
+
+Or run the app module directly:
+
+```bash
+uv run streamlit run src/investing_agents/streamlit_app.py
+```
+
+By default, the UI includes a target set to `http://localhost:8000` and exposes three tabs:
+
+- **Chat**: interact with a single agent target and inspect response timing.
+- **Compare**: send one prompt to multiple targets side-by-side.
+- **Evaluate**: run batch prompts across selected targets, review pass/fail and rating per row, and inspect summary metrics.
+
+#### Local Helper Mode
+
+From the Streamlit sidebar, you can optionally start and stop local agent servers for quick experiments.
+
+- Choose provider/model/port.
+- Click **Start Local Server**.
+- The target is auto-added to the target registry.
+
+This mode is optional. You can also connect only to remote or manually started local URLs.
+
 ### Example Queries
 
 Try these example questions with the agent:
@@ -237,6 +271,9 @@ investing-agents/
 │       ├── __init__.py           # Package initialization
 │       ├── __main__.py           # Server entry point
 │       ├── agent_executor.py    # Investment agent logic
+│       ├── a2a_client_utils.py  # Shared A2A client helpers for UI/eval
+│       ├── streamlit_app.py     # Streamlit frontend
+│       ├── streamlit_launcher.py # Script entrypoint for Streamlit app
 │       └── test_client.py       # Test client
 ├── pyproject.toml               # Project dependencies
 ├── .gitignore                   # Git ignore rules
