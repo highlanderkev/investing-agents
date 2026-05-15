@@ -67,6 +67,9 @@ def _render_sidebar() -> None:
     st.sidebar.header("Targets")
 
     with st.sidebar.expander("Target Registry", expanded=True):
+        updated_targets = []
+        remove_idx = None
+
         for idx, target in enumerate(st.session_state.targets):
             cols = st.columns([1.5, 2.5, 1, 0.8])
             name = cols[0].text_input(
@@ -89,15 +92,20 @@ def _render_sidebar() -> None:
             )
             remove = cols[3].button("Remove", key=f"target_remove_{idx}")
 
-            st.session_state.targets[idx] = {
-                "name": name.strip() or f"Target {idx + 1}",
-                "url": url.strip(),
-                "enabled": enabled,
-            }
-
             if remove:
-                st.session_state.targets.pop(idx)
-                st.rerun()
+                remove_idx = idx
+            else:
+                updated_targets.append({
+                    "name": name.strip() or f"Target {len(updated_targets) + 1}",
+                    "url": url.strip(),
+                    "enabled": enabled,
+                })
+
+        if remove_idx is not None:
+            st.session_state.targets = updated_targets
+            st.rerun()
+        else:
+            st.session_state.targets = updated_targets
 
         if st.button("Add Target"):
             st.session_state.targets.append(
@@ -214,8 +222,8 @@ def _render_compare_tab() -> None:
     st.subheader("Side-by-Side Compare")
 
     enabled_targets = _enabled_targets()
-    if len(enabled_targets) < 1:
-        st.warning("Enable at least one target in the sidebar.")
+    if len(enabled_targets) < 2:
+        st.warning("Enable at least two targets in the sidebar to compare responses.")
         return
 
     default_prompt = "How should I diversify a portfolio with moderate risk tolerance?"
