@@ -6,8 +6,10 @@ and provides financial analysis using AI.
 
 import logging
 import os
+import re
 import textwrap
 import uuid
+from pathlib import Path
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
@@ -54,7 +56,10 @@ INVESTMENT_ADVISOR_SYSTEM_PROMPT = textwrap.dedent("""
 _PROMPT = ChatPromptTemplate.from_messages(
     [
         ("system", INVESTMENT_ADVISOR_SYSTEM_PROMPT),
-        ("human", "{query}"),
+        (
+            "human",
+            "User query:\n{query}\n\nRetrieved financial document context:\n{context_block}",
+        ),
     ]
 )
 
@@ -66,6 +71,84 @@ _DEFAULT_MODELS: dict[str, str] = {
     "azure": "gpt-4o-mini",
     "ollama": "llama3.2",
 }
+
+
+class LocalDocumentRetriever:
+    """Simple local-document retriever for financial statements and reports."""
+
+    _SUPPORTED_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".html", ".xml"}
+
+    def __init__(
+        self,
+        docs_path: str,
+        *,
+        max_files: int = 20,
+        max_chunks: int = 3,
+        chunk_size: int = 1200,
+    ) -> None:
+        self.docs_root = Path(docs_path)
+        self.max_files = max_files
+        self.max_chunks = max_chunks
+        self.chunk_size = chunk_size
+
+    def retrieve(self, query: str) -> list[str]:
+        """Return top-matching chunks for the query from local documents."""
+        if not self.docs_root.exists() or not self.docs_root.is_dir():
+            return []
+
+        query_terms = self._tokenize(query)
+        if not query_terms:
+            return []
+
+        top: list[tuple[int, str]] = []
+        files_seen = 0
+        for file_path in self.docs_root.rglob("*"):
+            if files_seen >= self.max_files:
+                break
+            if not file_path.is_file():
+                continue
+            if file_path.suffix.lower() not in self._SUPPORTED_EXTENSIONS:
+                continue
+
+            files_seen += 1
+            text = self._read_text(file_path)
+            if not text:
+                continue
+            for chunk in self._chunk_text(text):
+                score = self._score_chunk(chunk, query_terms)
+                if score <= 0:
+                    continue
+                top.append((score, chunk))
+                top.sort(key=lambda item: item[0], reverse=True)
+                del top[self.max_chunks :]
+
+        return [chunk for _, chunk in top]
+
+    @staticmethod
+    def _tokenize(text: str) -> set[str]:
+        return {token for token in re.findall(r"[a-zA-Z][a-zA-Z0-9]+", text.lower()) if len(token) > 2}
+
+    @staticmethod
+    def _read_text(file_path: Path) -> str:
+        try:
+            return file_path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return ""
+
+    def _chunk_text(self, text: str) -> list[str]:
+        chunks = []
+        normalized = " ".join(text.split())
+        for start in range(0, len(normalized), self.chunk_size):
+            chunk = normalized[start : start + self.chunk_size].strip()
+            if chunk:
+                chunks.append(chunk)
+        return chunks
+
+    @staticmethod
+    def _score_chunk(chunk: str, query_terms: set[str]) -> int:
+        chunk_terms = LocalDocumentRetriever._tokenize(chunk)
+        overlap = query_terms.intersection(chunk_terms)
+        return len(overlap)
 
 
 def _build_agent_text_message(text: str):
@@ -233,6 +316,22 @@ class InvestmentAgent:
             LLM_MODEL    — optional model name override
         """
         self.llm = _build_llm()
+        self.retriever = self._build_retriever()
+
+    @staticmethod
+    def _build_retriever() -> LocalDocumentRetriever | None:
+        docs_path = os.getenv("RAG_DOCUMENTS_PATH")
+        if not docs_path:
+            return None
+        return LocalDocumentRetriever(docs_path)
+
+    def _get_context(self, query: str) -> str:
+        if not self.retriever:
+            return ""
+        chunks = self.retriever.retrieve(query)
+        if not chunks:
+            return ""
+        return "\n\n---\n\n".join(chunks)
 
     async def analyze(self, query: str) -> str:
         """Analyze investment-related queries.
@@ -243,15 +342,25 @@ class InvestmentAgent:
         Returns:
             Investment analysis or advice.
         """
+        context_block = self._get_context(query)
+
         if self.llm:
             chain = _PROMPT | self.llm
             try:
-                response = await chain.ainvoke({"query": query})
+                response = await chain.ainvoke(
+                    {
+                        "query": query,
+                        "context_block": context_block or "No relevant financial documents were retrieved.",
+                    }
+                )
                 return response.content
             except Exception as e:
                 return f"Error generating AI response: {e}"
         else:
-            return self._get_basic_response(query)
+            response = self._get_basic_response(query)
+            if not context_block:
+                return response
+            return f"Retrieved financial document context:\n{context_block}\n\n{response}"
 
     def _get_basic_response(self, query: str) -> str:
         """Provide basic investment advice without AI.
