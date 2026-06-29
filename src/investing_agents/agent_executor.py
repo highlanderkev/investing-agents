@@ -100,20 +100,29 @@ class LocalDocumentRetriever:
         if not query_terms:
             return []
 
-        candidates: list[tuple[int, str]] = []
-        for file_path in list(self.docs_root.rglob("*"))[: self.max_files]:
+        top: list[tuple[int, str]] = []
+        files_seen = 0
+        for file_path in self.docs_root.rglob("*"):
+            if files_seen >= self.max_files:
+                break
+            if not file_path.is_file():
+                continue
             if file_path.suffix.lower() not in self._SUPPORTED_EXTENSIONS:
                 continue
+
+            files_seen += 1
             text = self._read_text(file_path)
             if not text:
                 continue
             for chunk in self._chunk_text(text):
                 score = self._score_chunk(chunk, query_terms)
-                if score > 0:
-                    candidates.append((score, chunk))
+                if score <= 0:
+                    continue
+                top.append((score, chunk))
+                top.sort(key=lambda item: item[0], reverse=True)
+                del top[self.max_chunks :]
 
-        candidates.sort(key=lambda item: item[0], reverse=True)
-        return [chunk for _, chunk in candidates[: self.max_chunks]]
+        return [chunk for _, chunk in top]
 
     @staticmethod
     def _tokenize(text: str) -> set[str]:
