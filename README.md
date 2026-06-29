@@ -14,6 +14,8 @@ This project implements an A2A-compliant agent for investment and financial stra
 
 The agent uses [LangChain](https://python.langchain.com/) to integrate with multiple LLM providers (OpenAI, Anthropic, Google Gemini, Azure OpenAI, and Ollama) for intelligent, context-aware responses, and falls back to structured guidance when no AI provider is configured.
 
+It also supports optional local-document retrieval (RAG) so responses can reference financial statements and other financial documents stored on disk.
+
 ## Architecture
 
 This implementation follows the A2A protocol specification and is based on the [a2a-samples](https://github.com/a2aproject/a2a-samples) repository structure.
@@ -147,6 +149,17 @@ Configure the server using environment variables:
 - `AZURE_OPENAI_API_KEY`: Azure OpenAI API key (required when `LLM_PROVIDER=azure`)
 - `AZURE_OPENAI_ENDPOINT`: Azure OpenAI endpoint URL (required when `LLM_PROVIDER=azure`)
 - `OLLAMA_BASE_URL`: Ollama server URL (used when `LLM_PROVIDER=ollama`, default: `http://localhost:11434`)
+- `RAG_DOCUMENTS_PATH`: Optional directory path containing financial documents for retrieval-augmented responses (`.txt`, `.md`, `.csv`, `.json`, `.html`, `.xml`)
+
+### Optional: Enable Local Document RAG
+
+Point the agent at a local directory containing financial documents:
+
+```bash
+export RAG_DOCUMENTS_PATH="/absolute/path/to/financial-docs"
+```
+
+When set, the agent retrieves relevant document chunks and includes them as context for analysis.
 
 ## Usage
 
