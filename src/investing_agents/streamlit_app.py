@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
+from dotenv import load_dotenv
 
 from investing_agents.a2a_client_utils import (
     AgentTarget,
@@ -24,6 +25,8 @@ from investing_agents.a2a_client_utils import (
     run_prompt,
     summarize_results,
 )
+
+load_dotenv()
 
 
 def main() -> None:
@@ -105,11 +108,13 @@ def _render_sidebar() -> None:
             if remove:
                 remove_idx = idx
             else:
-                updated_targets.append({
-                    "name": name.strip() or f"Target {len(updated_targets) + 1}",
-                    "url": url.strip(),
-                    "enabled": enabled,
-                })
+                updated_targets.append(
+                    {
+                        "name": name.strip() or f"Target {len(updated_targets) + 1}",
+                        "url": url.strip(),
+                        "enabled": enabled,
+                    }
+                )
 
         if remove_idx is not None:
             st.session_state.targets = updated_targets
@@ -163,13 +168,13 @@ def _render_sidebar() -> None:
                         # Show last few lines of stderr if process exited with error
                         if process.poll() is not None and process.poll() != 0:
                             try:
-                                stderr_path = Path(proc_info['stderr_log'])
+                                stderr_path = Path(proc_info["stderr_log"])
                                 if stderr_path.exists():
                                     stderr_content = stderr_path.read_text()
-                                    last_lines = stderr_content.strip().split('\n')[-10:]
+                                    last_lines = stderr_content.strip().split("\n")[-10:]
                                     if last_lines:
                                         st.text("Last 10 lines of stderr:")
-                                        st.code('\n'.join(last_lines))
+                                        st.code("\n".join(last_lines))
                             except Exception:
                                 pass
 

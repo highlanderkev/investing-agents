@@ -14,8 +14,11 @@ from a2a.types import (
     AgentCard,
     AgentSkill,
 )
+from dotenv import load_dotenv
 
 from investing_agents.agent_executor import InvestmentAgentExecutor
+
+load_dotenv()
 
 
 def create_agent_card(url: str = "http://localhost:8000/") -> AgentCard:
@@ -145,7 +148,9 @@ def main():
         print(f"✓ LLM provider configured: {llm_provider}")
     else:
         print("⚠ No LLM provider configured - using basic responses")
-        print("  Set LLM_PROVIDER (openai, anthropic, google, azure, ollama) to enable AI-powered analysis")
+        print(
+            "  Set LLM_PROVIDER (openai, anthropic, google, azure, ollama) to enable AI-powered analysis"
+        )
 
     # Run the server
     uvicorn.run(server.build(), host=host, port=port)

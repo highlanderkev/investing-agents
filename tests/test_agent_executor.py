@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from investing_agents.agent_executor import InvestmentAgent, LocalDocumentRetriever, _build_llm
@@ -78,3 +80,17 @@ async def test_fallback_response_includes_rag_context(monkeypatch, tmp_path):
 
     assert "Retrieved financial document context" in response
     assert "Cash flow from operations increased" in response
+
+
+def test_dotenv_loaded_on_import(tmp_path, monkeypatch):
+    import importlib
+
+    dotenv_file = tmp_path / ".env"
+    dotenv_file.write_text("TEST_DOTENV_KEY=loaded_val\n", encoding="utf-8")
+    monkeypatch.delenv("TEST_DOTENV_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    import investing_agents
+
+    importlib.reload(investing_agents)
+    assert os.getenv("TEST_DOTENV_KEY") == "loaded_val"
