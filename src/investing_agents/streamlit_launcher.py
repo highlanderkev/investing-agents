@@ -5,9 +5,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 
 def main() -> None:
     """Entry-point script for `investing-agents-ui`."""
+    load_dotenv()
     from streamlit.web import cli as stcli
 
     app_path = Path(__file__).with_name("streamlit_app.py")
